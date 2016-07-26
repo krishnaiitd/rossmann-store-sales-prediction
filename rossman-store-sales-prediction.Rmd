@@ -1,0 +1,43 @@
+---
+title: Rossmann Store Sales Prediction
+author: "Krishna Prasad"
+date: "25 July 2016"
+output: html_document
+---
+## List of available datasets
+
+* store.csv
+* train.csv
+* test.csv
+* sample_submission
+
+## Understanding of the variables in the datasets
+```{r cache=TRUE, eval=FALSE}
+store <- read.csv("store.csv", header = TRUE, sep=",")
+names(store)
+nrow(store)
+ncol(store)
+summary(store)
+```
+#### Dataset: store.csv and variables possible values
+* **Store**: A unique integer id for each store, total number of store `1115`
+* **StoreType**: Possible values: `a:602, b:17, c:148, d:348`. Store models, _categorical values_ 
+* **Assortment**: Describes an assortment level: a = basic, b = extra, c = extended, _categorical values_ 
+* **CompetitionDistance**: Distance in meters to the nearest competitor store, it has missing data
+* **CompetitionOpenSinceMonth**: Gives the approximate months of the time the nearest competitor was opened, possible value 1(JAN) to 12(DEC), _it has missin values_
+* **CompetitionOpenSinceYear**: Gives the year of the time the nearest competitor was opened, possible value `Year` _it has missin values_
+* **Promo2**: Indicates whether a store is running a promo on that day, possible values _TRUE_ or _FALSE_
+* **Promo2SinceWeek/Year**: Promo2Since[Year/Week] - describes the year and calendar week when the store started participating in Promo2
+* **PromoInterval**: Describes the consecutive intervals Promo2 is started, naming the months the promotion is started anew. E.g. "Feb,May,Aug,Nov" means each round starts in February, May, August, November of any given year for that store
+
+From simple intuitive say that Promo2, Promo2SinceWeek/Year, PromoInterval, competitir distance from store and start month-year, store type and store Assortment has influence on the sales, we will check compare which one has higher influence over sales by merging the store date with training dataset and finding the **covarience** with sales figure and by exploratory analysis
+with categorical varaible.
+
+Let's first check the varaibles in training dataset:
+```{r cache=TRUE, eval=TRUE, echo=TRUE}
+train <- read.csv("train.csv", header = TRUE, sep=",")
+names(train)
+nrow(train)
+ncol(train)
+summary(train)
+```
