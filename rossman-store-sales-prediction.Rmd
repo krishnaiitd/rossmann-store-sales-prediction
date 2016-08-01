@@ -12,7 +12,7 @@ output: html_document
 * sample_submission
 
 ## Understanding of the variables in the datasets
-```{r cache=TRUE, eval=FALSE}
+```{r cache=FALSE, eval=TRUE}
 store <- read.csv("store.csv", header = TRUE, sep=",")
 names(store)
 nrow(store)
@@ -33,11 +33,207 @@ summary(store)
 From simple intuitive say that Promo2, Promo2SinceWeek/Year, PromoInterval, competitir distance from store and start month-year, store type and store Assortment has influence on the sales, we will check compare which one has higher influence over sales by merging the store date with training dataset and finding the **covarience** with sales figure and by exploratory analysis
 with categorical varaible.
 
+
+#### Dataset: train.csv and variables possible values
 Let's first check the varaibles in training dataset:
-```{r cache=TRUE, eval=TRUE, echo=TRUE}
+```{r cache=FALSE, eval=TRUE, echo=TRUE}
 train <- read.csv("train.csv", header = TRUE, sep=",")
 names(train)
 nrow(train)
 ncol(train)
 summary(train)
 ```
+
+* **Store**: Store ID as mentioned above.
+* **DayOfWeek**: Monday => 1 and Sunday => 7.
+* **Date**: Store open date.
+* **Sales**: Total turnover of the given day (Prediction variable)
+* **Customers**: Total number of customer
+* **Open**: Shop is open or not, 0 = closed, 1 = open
+* **Promo**: Is any promotion running or not, 0 = no promo, 1 = promo
+* **StateHoliday**: Indicates a state holiday, a = public holiday, b = Easter holiday, c = Christmas, 0 = None
+* **SchoolHoliday**: Indicates public schools close or not, 1 = school holiday, 0 = not school holiday
+
+#### Dataset: test.csv and variables possible values
+Let's first check the varaibles in training dataset:
+```{r cache=FALSE, eval= TRUE}
+test <- read.csv("test.csv")
+names(test)
+```
+
+* **Id**: Serial number of test cases
+* **Store**: Store id as discussed above
+* **DayOfWeek**: As discuss above
+* **Date**: Store open date.
+* **Open**: Shop is open or not, 0 = closed, 1 = open
+* **Promo**: Is any promotion running or not, 0 = no promo, 1 = promo
+* **StateHoliday**: Indicates a state holiday, a = public holiday, b = Easter holiday, c = Christmas, 0 = None
+* **SchoolHoliday**: Indicates public schools close or not, 1 = school holiday, 0 = not school holiday
+
+
+##### **Customers** records are not in test data set, which indicate that this should not be considered as feature in model.
+
+## Feature Selection 
+
+* **Customers** records are not in test data set, which indicate that this should not be considered as feature in model.
+* **DayOfWeek** Let's plot the averge Sales on each days, Mon(1) to Sun(7)
+```{r cache=FALSE, eval=TRUE, echo=TRUE}
+
+library(dplyr)
+library(ggplot2)
+AvgRev_by_DayOfWeek <- train %>% group_by(DayOfWeek) %>% summarise(revenue = sum(as.numeric(Sales))/n())
+g <- ggplot(data = AvgRev_by_DayOfWeek, aes(x= DayOfWeek, y = revenue, fill = DayOfWeek))
+g <- g + geom_bar(stat="identity")
+plot(g)
+rm(g)
+```
+
+So the `DayOfWeek` columns can taken as feature by three ways:
+* it can be bucket into three group: Monday(which has heighest Sales value) => Mon, Tuesday to Saturday => TWTFS, Sunday => Sun.
+* it can be bucket into four group: Monday => Mon, Tue .. Friday => TWTF, Saturday => Sat & Sunday. Will train model for both and check the accuracy 
+
+* **Date**:
+Now let's check that the months, years are also influrenace the sales values or not
+```{r cache=FALSE, echo=TRUE, eval=TRUE}
+library(dplyr)
+library(ggplot2)
+months <- strftime(train$Date, '%b')
+months[1:3]
+train <- data.frame(train, months)
+head(train)
+# Group by month and find the Average Sales
+Avg_Rev_Months <- train %>% group_by(months) %>% summarise(AvgRev = sum(as.numeric(Sales))/n())
+Avg_Rev_Months
+g <- ggplot(data = Avg_Rev_Months, aes(x=months, y = AvgRev, fill = months))
+g <- g + geom_bar(stat = "identity")
+plot(g)
+rm(g)
+rm(Avg_Rev_Months)
+```
+
+so the month can also be combine or without combination can be use as feature vector.
+If we combine then Dec - can be goes into single bucket, Jul & Nov goes to another bucket and remain on the other bucket as per the above bar graph.
+
+
+Let's check with year sales plot the graph
+```{r echo=TRUE, cache=FALSE, eval=TRUE}
+train$Date <- as.Date(train$Date, "%d/%m/%y")
+years <- strftime(train$Date, '%Y')
+years[1:2]
+train <- data.frame(train, years)
+head(train)
+Avg_Rev_year <- train %>% group_by(years) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales))/n()))
+Avg_Rev_year
+g <- ggplot(data = Avg_Rev_year, aes(x=years, y = AvgRev, fill = years))
+g <- g + geom_bar(stat = "identity")
+plot(g)
+rm(g)
+rm(Avg_Rev_year)
+```
+So years can also be treated as feature vectors.
+
+* **Open**:
+Its straightforward that open is feature vector in the Sales but not meet the condition of IID since if the shop is close then Sales = 0 always, it can also be shown by graph, This feature vector can be droped before model training and if any records found in test data set then we will predict the Sales value 0.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+Sales_open <- train %>% group_by(Open) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales)))/ n())
+Sales_open$Open <- factor(Sales_open$Open)
+g <- ggplot(data = Sales_open, aes(x= Open, y = AvgRev, fill = Open)) + geom_bar(stat = "identity")
+plot(g)
+rm(g)
+rm(Sales_open)
+```
+
+* **Promo**: Let's see the effect of promotion on Sales
+```{r echo= TRUE, cache=FALSE, eval=TRUE}
+library(dplyr)
+library(ggplot2)
+train = subset(train, train$Open == 1)
+Sales_Promo <- train %>% group_by(Promo) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales)))/n())
+Sales_Promo$Promo <- factor(Sales_Promo$Promo)
+g <- ggplot(data = Sales_Promo, aes(x = Promo, y= AvgRev, fill = Promo))
+g <- g + geom_bar(stat = "identity")
+plot(g)
+rm(g)
+rm(Sales_Promo)
+```
+Let's see the correlation of Sales with Promo `r cor(train$Sales, train$Promo)`, it says that Promo is correlated to Sales figure.
+
+* **StateHoliday**: 
+```{r echo= TRUE, cache=FALSE, eval=TRUE}
+library(dplyr)
+library(ggplot2)
+# Removed the close data first
+train = subset(train, train$Open == 1)
+Sales_Stateholiday <- train %>% group_by(StateHoliday) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales)))/n())
+Sales_Stateholiday$StateHoliday <- factor(Sales_Stateholiday$StateHoliday)
+g <- ggplot(data = Sales_Stateholiday, aes(x = StateHoliday, y = AvgRev, fill = StateHoliday)) + geom_bar(stat = "identity")
+plot(g)
+```
+
+* **SchoolHoliday**: 
+```{r echo= TRUE, cache=FALSE, eval=TRUE}
+library(dplyr)
+library(ggplot2)
+train = subset(train, train$Open == 1)
+Sales_SchoolHoliday <- train %>% group_by(SchoolHoliday) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales)))/n())
+Sales_SchoolHoliday$SchoolHoliday <- factor(Sales_SchoolHoliday$SchoolHoliday)
+g <- ggplot(data = Sales_SchoolHoliday, aes(x = SchoolHoliday, y = AvgRev, fill = SchoolHoliday)) + geom_bar(stat = "identity")
+plot(g)
+```
+
+### **Store** columns can also be use as feature vectors, let's merge the store data set into training and find out the possible feature vector.
+```{r}
+names(store)
+# Merge the store data into training data
+train <- left_join(train, store, by = "Store")
+train = subset(train, train$Open == 1)
+```
+* **StoreType**: It has categorical values, let's check the distribution of number of store for each categories and averge sales of each store type:
+```{r}
+# count
+type_count <- train %>% group_by(StoreType) %>% summarise(totalCount = n()/nrow(train))
+g <- ggplot(data= type_count, aes(x = StoreType, y = totalCount, fill = StoreType)) + geom_bar(stat = "identity")
+plot(g)
+
+type_Avg_sales <- train %>% group_by(StoreType) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales)))/n())
+g <- ggplot(data= type_Avg_sales, aes(x = StoreType, y = AvgRev, fill = StoreType)) + geom_bar(stat = "identity")
+plot(g)
+rm(type_Avg_sales)
+rm(type_count)
+```
+Clearly Storetype can be use a feature vector in the model
+
+* **Assortment**: Distribution of Sales with Assortments
+```{r}
+head(train)
+# count
+Assortment_count <- train %>% group_by(Assortment) %>% summarise(totalCount = n()/nrow(train))
+g <- ggplot(data= Assortment_count, aes(x = Assortment, y = totalCount, fill = Assortment)) + geom_bar(stat = "identity")
+plot(g)
+
+Assortment_Avg_sales <- train %>% group_by(Assortment) %>% summarise(AvgRev = as.numeric(sum(as.numeric(Sales)))/n())
+g <- ggplot(data= Assortment_Avg_sales, aes(x = Assortment, y = AvgRev, fill = Assortment)) + geom_bar(stat = "identity")
+plot(g)
+rm(g)
+rm(Assortment_count)
+rm(Assortment_Avg_sales)
+```
+* **CompetitionDistance**: Let's check the correlation of CompetitionDistance with Sales:
+```{r}
+# train$CompetitionDistance has 'NA' values, so if there is competiting shop near to a existing then obvious it effect the sales values to the existing shop and if the distance goes furhter then the effect of competiting open shop might be less on Sales, so it is inversly propersional to sales i.e train$CompetitionDistance increase then effect on sales values decreases. Now to handle the shop which has no completiting shop near by, it can be handle by putting large value of train$CompetitionDistance, i.e two times the max(train$CompetitionDistance).
+maxValue <- 2*max(train$CompetitionDistance, na.rm = TRUE)
+train[is.na(train$CompetitionDistance), ]$CompetitionDistance <- maxValue
+cor(train$Sales, train$CompetitionDistance)
+```
+Negative correlation show that the competition Distance has inversely proportional to Sales, so it can reverse and then find the correlation
+```{r}
+#Reverse the distance i.e 1/CompetitionDistance for each rows
+
+```
+
+
+
+

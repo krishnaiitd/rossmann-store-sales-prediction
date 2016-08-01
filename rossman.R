@@ -10,7 +10,7 @@ if(!exists("train")) {
   train <- read.csv("train.csv")
 }
 
-train$Date <- as.Date(train$Date)
+train$Date <- as.Date(train$Date, "%d/%m/%y")
 
 print(nrow(train))
 print(ncol(train))
@@ -38,13 +38,15 @@ rm(g)
 rm(stores_revenue)
 
 
-revenue_by_DayOfWeek <- train %>% group_by(DayOfWeek) %>% summarise(revenue = sum(Sales))
+revenue_by_DayOfWeek <- train %>% group_by(DayOfWeek) %>% summarise(revenue = sum(Sales)/n())
 g <- ggplot(data = revenue_by_DayOfWeek, aes(x= DayOfWeek, y = revenue))
 g <- g + geom_bar(stat="identity")
 g <- g + xlab('Day of Week') + ylab('Total Revenue')
-g <- g + ggtitle('Revenue on each days')
+g <- g + ggtitle('Average Revenue on each days')
 plot(g)
 rm(g)
 #rm(revenue_by_DayOfWeek)
+
+
 
 
